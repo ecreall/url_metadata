@@ -133,10 +133,23 @@ def parse_url_metadata(url, html=None):
             # Retrieve the original URL. The URL can be shortened by an URL shortener like bitly
             original_url = resp.url
             page = resp.read()
+
         url_metadata = metadata_parser.MetadataParser(
-            html=page.decode('utf-8'), requests_timeout=100)
+            html=page.decode('utf-8'), requests_timeout=100,
+            support_malformed=True)
     except Exception:
         return None
+    
+    # Retrieve the url data like the reading time
+    data = []
+    data_nb = 1
+    label = url_metadata.get_metadata('label'+str(data_nb), None)
+    while label:
+        data.append(
+            {'label': label,
+             'data': url_metadata.get_metadata('data'+str(data_nb), None)})
+        data_nb += 1
+        label = url_metadata.get_metadata('label'+str(data_nb), None)
 
     # Formatting and verification of metadata
     thumbnail_url = url_metadata.get_metadata('image', None)
@@ -154,7 +167,8 @@ def parse_url_metadata(url, html=None):
         'title': url_metadata.get_metadata('title', None),
         'description': url_metadata.get_metadata('description', None),
         'provider_name': site_name,
-        'thumbnail_url': thumbnail_url
+        'thumbnail_url': thumbnail_url,
+        'data': data
     }
     result.update(extract_metadata(original_url, page=page))
     return result
