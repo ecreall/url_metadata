@@ -10,6 +10,7 @@ import metadata_parser
 import os.path
 import urllib
 import requests
+import hashlib
 from flask import url_for
 from bs4 import BeautifulSoup
 
@@ -135,7 +136,8 @@ def parse_url_metadata(url, html=None):
             page = resp.read()
 
         url_metadata = metadata_parser.MetadataParser(
-            html=page.decode('utf-8'), requests_timeout=100,
+            html=page.decode('utf-8'),
+            requests_timeout=100,
             support_malformed=True)
     except Exception:
         return None
@@ -211,3 +213,61 @@ def get_url_metadata(url, html=None, picture_uploader=None, providers=oembed_pro
 
 
     return url_metadata
+
+
+def get_picture_uploader(cursor):
+    def insert_picture(url):
+        try:
+            # read the picture from the URL
+            blob = urllib.request.urlopen(
+                urllib.request.Request(url, headers=headers)).read()
+            # generate an id for this URL
+            img_id = hashlib.sha256(url.encode('utf-8')).hexdigest()
+            exist_img_query = """
+                SELECT PICTURE FROM PICTURES
+                    WHERE ID='{img_id}'
+                """.format(img_id=img_id)
+            result_cursor = cursor.execute(exist_img_query)
+            result_fetch = result_cursor.fetchone()
+            # if the picture exist return the img_id else add it to the database
+            if not result_fetch:
+                add_img_query = """INSERT INTO PICTURES
+                (ID, PICTURE)
+                VALUES(?, ?);"""
+                cursor.execute(add_img_query, [img_id, sqlite3.Binary(blob)])
+
+            return img_id
+        except Exception:
+            return None
+
+    return insert_picture
+
+
+def add_url_metadata(url, cursor):
+    try:
+        # retrieve the metadata directly from the database if the URL already exists
+        # else insert a new line in the database
+        exist_url_query = """
+            SELECT METADATA FROM URL_METADATA
+                WHERE URL='{url}'
+            """.format(url=url)
+        result_cursor = cursor.execute(exist_url_query)
+        result_fetch = result_cursor.fetchone()
+        if result_fetch:
+            url_metadata = json.loads(result_fetch[0])
+        else:
+            url_metadata = get_url_metadata(
+                url, picture_uploader=get_picture_uploader(cursor))
+            result_cursor = cursor.execute('SELECT max(ID) FROM URL_METADATA')
+            last_id = cursor.fetchone()[0] or 0
+            url_metadata['id'] = last_id
+            insert_row = """
+                INSERT INTO URL_METADATA (URL, METADATA)
+                    VALUES (?, ?)
+                """
+            cursor.execute(insert_row, [url, json.dumps(url_metadata)])
+
+        return url_metadata
+    except Exception as e:
+        return None
+    

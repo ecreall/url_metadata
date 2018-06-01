@@ -14,14 +14,17 @@ from flask import (
     jsonify, send_file, abort)
 from flask_cors import CORS, cross_origin
 from sqlite3 import OperationalError
+from flask_graphql import GraphQLView
 
-from utils import get_url_metadata, headers
-
+from utils import get_url_metadata, headers, add_url_metadata
+from graphql_schema import schema
 
 #Assuming urls.db is in your app root folder
 app = Flask(__name__)
 
-cors = CORS(app, resources={r"/": {"origins": "*"}})
+cors = CORS(app, resources={r"/": {"origins": "*"}, r"/graphql": {"origins": "*"}})
+
+app.add_url_rule('/graphql', view_func=GraphQLView.as_view('graphql', schema=schema, graphiql=True))
 
 DB_FILENAME = 'var/urls.db'
 
@@ -53,34 +56,6 @@ def table_check():
             pass
 
 
-def get_picture_uploader(cursor):
-    def insert_picture(url):
-        try:
-            # read the picture from the URL
-            blob = urllib.request.urlopen(
-                urllib.request.Request(url, headers=headers)).read()
-            # generate an id for this URL
-            img_id = hashlib.sha256(url.encode('utf-8')).hexdigest()
-            exist_img_query = """
-                SELECT PICTURE FROM PICTURES
-                    WHERE ID='{img_id}'
-                """.format(img_id=img_id)
-            result_cursor = cursor.execute(exist_img_query)
-            result_fetch = result_cursor.fetchone()
-            # if the picture exist return the img_id else add it to the database
-            if not result_fetch:
-                add_img_query = """INSERT INTO PICTURES
-                (ID, PICTURE)
-                VALUES(?, ?);"""
-                cursor.execute(add_img_query, [img_id, sqlite3.Binary(blob)])
-
-            return img_id
-        except Exception:
-            return None
-
-    return insert_picture
-
-
 @app.route('/', methods=['GET', 'POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def home():
@@ -92,28 +67,7 @@ def home():
             url = request.args.get('url', None) if \
                 is_get else request.form.get('url', None)
             if url:
-                # retrieve the metadata directly from the database if the URL already exists
-                # else insert a new line in the database
-                exist_url_query = """
-                    SELECT METADATA FROM URL_METADATA
-                        WHERE URL='{url}'
-                    """.format(url=url)
-                result_cursor = cursor.execute(exist_url_query)
-                result_fetch = result_cursor.fetchone()
-                if result_fetch:
-                    url_metadata = json.loads(result_fetch[0])
-                else:
-                    url_metadata = get_url_metadata(
-                        url, picture_uploader=get_picture_uploader(cursor))
-                    result_cursor = cursor.execute('SELECT max(ID) FROM URL_METADATA')
-                    last_id = cursor.fetchone()[0] or 0
-                    url_metadata['id'] = last_id
-                    insert_row = """
-                        INSERT INTO URL_METADATA (URL, METADATA)
-                            VALUES (?, ?)
-                        """
-                    cursor.execute(insert_row, [url, json.dumps(url_metadata)])
-
+                url_metadata = add_url_metadata(url, cursor)
                 # return the result to the user
                 if is_get:
                     return jsonify(**{'code': 'SUCCESS',
