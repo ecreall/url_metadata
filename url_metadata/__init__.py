@@ -16,7 +16,7 @@ from flask_cors import CORS, cross_origin
 from sqlite3 import OperationalError
 from flask_graphql import GraphQLView
 
-from utils import get_url_metadata, headers, add_url_metadata
+from .utils import get_url_metadata, headers, add_url_metadata
 from graphql_schema import schema
 
 #Assuming urls.db is in your app root folder
@@ -107,10 +107,3 @@ def picture(picture_id):
             return abort(404)
         except Exception as error:
             return abort(404)
-
-
-if __name__ == '__main__':
-    # This code checks whether database table is created or not
-    table_check()
-    # app.run(debug=True)
-    app.run(host='0.0.0.0')
