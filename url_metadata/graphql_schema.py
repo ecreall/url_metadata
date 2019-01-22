@@ -3,7 +3,7 @@ import graphene
 from graphene import relay
 import sqlite3
 
-from utils import add_url_metadata
+from .utils import add_url_metadata
 
 
 DB_FILENAME = 'var/urls.db'

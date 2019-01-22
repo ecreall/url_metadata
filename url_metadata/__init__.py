@@ -17,7 +17,7 @@ from sqlite3 import OperationalError
 from flask_graphql import GraphQLView
 
 from .utils import get_url_metadata, headers, add_url_metadata
-from graphql_schema import schema
+from .graphql_schema import schema
 
 #Assuming urls.db is in your app root folder
 app = Flask(__name__)
