@@ -16,7 +16,7 @@ setuptools.setup(
     description="An URL metadata getter Flask micro website",
     long_description=_LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    url="https://github.com/assembl/url_metadata",
+    url="https://github.com/ecreall/url_metadata",
     packages=setuptools.find_packages(),
     license='AGPLv3',
     setup_requires=['pip>=6'],
